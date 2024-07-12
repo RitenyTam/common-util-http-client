@@ -7,8 +7,13 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,6 +22,8 @@ public class CommonHttpRestTemplate {
     private static final Logger logger = LoggerFactory.getLogger(CommonHttpRestTemplate.class);
 
     private String url;
+
+    private Charset charset = StandardCharsets.UTF_8;
 
     private HttpHeaders headers = new HttpHeaders();
 
@@ -34,12 +41,12 @@ public class CommonHttpRestTemplate {
     }
 
     private RestTemplate getRestTemplate() {
+        return getRestTemplate(connectionTimeout, readTimeout, charset);
+    }
 
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(connectionTimeout);
-        requestFactory.setReadTimeout(readTimeout);
-
-        return new RestTemplate(requestFactory);
+    public CommonHttpRestTemplate setCharset(Charset charset) {
+        this.charset = charset;
+        return this;
     }
 
     public CommonHttpRestTemplate setUrl(String url) {
@@ -104,7 +111,7 @@ public class CommonHttpRestTemplate {
 
         try {
             //发送请求
-            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout).exchange(url, HttpMethod.POST, new HttpEntity<>(null, headers), String.class);
+            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout, charset).exchange(url, HttpMethod.POST, new HttpEntity<>(null, headers), String.class);
 
             JSONObject responseBody = JSONObject.parseObject(ans.getBody());
 
@@ -126,7 +133,7 @@ public class CommonHttpRestTemplate {
 
         try {
             //发送请求
-            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout).exchange(url, HttpMethod.POST, new HttpEntity<>(requestJson, headers), String.class);
+            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout, charset).exchange(url, HttpMethod.POST, new HttpEntity<>(requestJson, headers), String.class);
 
             JSONObject responseBody = JSONObject.parseObject(ans.getBody());
 
@@ -148,7 +155,7 @@ public class CommonHttpRestTemplate {
 
         try {
             //发送请求
-            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout).exchange(url, HttpMethod.PUT, new HttpEntity<>(requestJson, headers), String.class);
+            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout, charset).exchange(url, HttpMethod.PUT, new HttpEntity<>(requestJson, headers), String.class);
 
             JSONObject responseBody = JSONObject.parseObject(ans.getBody());
 
@@ -169,7 +176,7 @@ public class CommonHttpRestTemplate {
 
         try {
             //发送请求
-            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout).exchange(url, HttpMethod.DELETE, new HttpEntity<>(requestJson, headers), String.class);
+            HttpEntity<String> ans = getRestTemplate(connectionTimeout, readTimeout, charset).exchange(url, HttpMethod.DELETE, new HttpEntity<>(requestJson, headers), String.class);
 
             JSONObject responseBody = JSONObject.parseObject(ans.getBody());
 
@@ -183,6 +190,7 @@ public class CommonHttpRestTemplate {
             throw e;
         }
     }
+
 
     public static <T> T executeGetMethod(String url, Map<String, Object> params, HttpHeaders headers, Class<T> responseType, Integer connTimeout, Integer readTimeout) {
 
@@ -208,7 +216,7 @@ public class CommonHttpRestTemplate {
 
         try {
             HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(params, headers);
-            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout)
+            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout, StandardCharsets.UTF_8)
                     .exchange(url, HttpMethod.GET, httpEntity, responseType);
 
             long useTime = System.currentTimeMillis() - startTime;
@@ -479,7 +487,7 @@ public class CommonHttpRestTemplate {
 
             HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(params, headers);
 
-            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout).exchange(url, HttpMethod.POST, httpEntity, responseType);
+            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout, StandardCharsets.UTF_8).exchange(url, HttpMethod.POST, httpEntity, responseType);
 
             long useTime = System.currentTimeMillis() - startTime;
             logger.info("#Response : " + url + " #Method : POST  #use time(ms) : " + useTime + " #Result : " + response.getBody());
@@ -657,7 +665,7 @@ public class CommonHttpRestTemplate {
 
             HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(params, headers);
 
-            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout).exchange(url, HttpMethod.PUT, httpEntity, responseType);
+            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout, StandardCharsets.UTF_8).exchange(url, HttpMethod.PUT, httpEntity, responseType);
 
             long useTime = System.currentTimeMillis() - startTime;
             logger.info("#Response : " + url + " #Method : PUT  #use time(ms) : " + useTime + " #Result : " + response.getBody());
@@ -851,7 +859,7 @@ public class CommonHttpRestTemplate {
 
         try {
             HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(params, headers);
-            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout)
+            HttpEntity<T> response = getRestTemplate(connTimeout, readTimeout, StandardCharsets.UTF_8)
                     .exchange(url, HttpMethod.DELETE, httpEntity, responseType);
 
             long useTime = System.currentTimeMillis() - startTime;
@@ -1114,12 +1122,21 @@ public class CommonHttpRestTemplate {
     }
 
 
-    private static RestTemplate getRestTemplate(Integer connTimeout, Integer readTimeout) {
+    private static RestTemplate getRestTemplate(Integer connTimeout, Integer readTimeout, Charset charset) {
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(connTimeout);
         requestFactory.setReadTimeout(readTimeout);
 
-        return new RestTemplate(requestFactory);
+        RestTemplate restTemplate = new RestTemplate(requestFactory);
+        List<HttpMessageConverter<?>> list = restTemplate.getMessageConverters();
+        for (HttpMessageConverter<?> httpMessageConverter : list) {
+            if (httpMessageConverter instanceof StringHttpMessageConverter) {
+                ((StringHttpMessageConverter) httpMessageConverter).setDefaultCharset(charset);
+                break;
+            }
+        }
+
+        return restTemplate;
     }
 }
